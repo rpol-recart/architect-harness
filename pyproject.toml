@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "architect-harness"
+version = "0.2.0"
+description = "Versioned architectural memory and decision workflow for a human–agent pair"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+classifiers = ["License :: OSI Approved :: Apache Software License"]
+
+[project.optional-dependencies]
+mcp = ["mcp==2.3.0"]
+
+[project.scripts]
+architect-harness = "architect_harness.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+architect_harness = ["assets/*.json", "assets/*.md", "assets/*.js"]

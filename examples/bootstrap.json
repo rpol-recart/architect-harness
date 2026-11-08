@@ -1,0 +1,19 @@
+{
+  "base_revision": 0,
+  "rationale": "Начальная граница проекта: пользователь проектирует систему через MCP-совместимый host; харнесс управляет архитектурным состоянием.",
+  "operations": [
+    {"op":"upsert_node","node":{"id":"system","kind":"system","title":"Агентский харнесс архитектора","data":{"tags":["python"],"responsibility":"Сохранять контекст и основания архитектурных решений"}}},
+    {"op":"upsert_node","node":{"id":"user","kind":"actor","title":"Пользователь — владелец целей","data":{}}},
+    {"op":"upsert_node","node":{"id":"host","kind":"external_system","title":"MCP host и модель","data":{"tags":["external_call","io"],"contract":"Совместимый MCP-клиент; управление моделью и инструментами вне этого сервиса"}}},
+    {"op":"upsert_node","node":{"id":"graph-service","kind":"component","title":"Архитектурный граф","data":{"tags":["python","mutable_state","transaction","database"],"responsibility":"Версии, решения, ссылки и атомарные изменения"}}},
+    {"op":"upsert_node","node":{"id":"architecture-data","kind":"data","title":"Архитектурное состояние проекта","data":{}}},
+    {"op":"upsert_node","node":{"id":"resume","kind":"scenario","title":"Продолжить проект в новой сессии","data":{"outcome":"Восстановлены границы, основания решений и существенные неизвестности"}}},
+    {"op":"upsert_node","node":{"id":"scope","kind":"constraint","title":"Контроль ограничен операциями сервиса","data":{"scope":"project","description":"Свободный shell и внешние инструменты host не контролируются этим прототипом"}}},
+    {"op":"upsert_node","node":{"id":"python-target","kind":"constraint","title":"Python 3.11+","data":{"scope":"project"}}},
+    {"op":"upsert_edge","edge":{"id":"contains-graph","source":"system","target":"graph-service","kind":"contains","data":{}}},
+    {"op":"upsert_edge","edge":{"id":"owns-graph","source":"graph-service","target":"architecture-data","kind":"owns","data":{}}},
+    {"op":"upsert_edge","edge":{"id":"host-system","source":"host","target":"system","kind":"interacts_with","data":{"protocol":"MCP stdio"}}},
+    {"op":"upsert_edge","edge":{"id":"scope-system","source":"scope","target":"system","kind":"constrains","data":{}}},
+    {"op":"upsert_edge","edge":{"id":"python-system","source":"python-target","target":"system","kind":"constrains","data":{}}}
+  ]
+}

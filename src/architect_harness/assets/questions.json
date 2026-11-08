@@ -1,0 +1,622 @@
+{
+  "version": "0.1",
+  "description": "Авторская адаптация архитектурных вопросов для харнесса. Вопросы — кандидаты исследования, не обязательные требования и не признаки дефекта. Текст вопроса не является исполняемой политикой.",
+  "matching": {
+    "profiles": "core всегда включён; python выбирается профилем",
+    "applies_to": "Совпадение kind узла",
+    "any_tags": "Если список непустой, требуется хотя бы один совпадающий тег data.tags. Теги объявляются явно; отсутствие тега не доказывает отсутствие свойства.",
+    "revisit_when": "Условие ручного повторного рассмотрения; автоматический механизм инвалидирования ответов не реализован в MVP."
+  },
+  "sources": {
+    "ADD-2024": {
+      "title": "Cervantes, Kazman — Designing Software Architectures, 2nd edition",
+      "url": "https://www.informit.com/store/designing-software-architectures-a-practical-approach-9780138108021"
+    },
+    "ARC42-METHOD": {
+      "title": "arc42 method",
+      "url": "https://arc42.org/method/"
+    },
+    "ARC42-BLOCKS": {
+      "title": "arc42 Building Block View",
+      "url": "https://docs.arc42.org/section-5/"
+    },
+    "SEI-MAINT-2020": {
+      "title": "SEI Maintainability, CMU/SEI-2020-TR-006",
+      "url": "https://www.sei.cmu.edu/library/maintainability/"
+    },
+    "FAIRBANKS-RISK": {
+      "title": "George Fairbanks — Risk-Driven Model",
+      "url": "https://www.georgefairbanks.com/software-architecture/risk-driven-model/"
+    },
+    "COSMIC-PYTHON": {
+      "title": "Architecture Patterns with Python",
+      "url": "https://www.cosmicpython.com/book/preface"
+    },
+    "COSMIC-LEGACY": {
+      "title": "Cosmic Python — Epilogue",
+      "url": "https://www.cosmicpython.com/book/epilogue_1_how_to_get_there_from_here"
+    },
+    "PYTHON-ASYNCIO": {
+      "title": "Python — Developing with asyncio",
+      "url": "https://docs.python.org/3/library/asyncio-dev.html"
+    },
+    "PYPA-LAYOUT": {
+      "title": "PyPA — src layout vs flat layout",
+      "url": "https://packaging.python.org/en/latest/discussions/src-layout-vs-flat-layout/"
+    }
+  },
+  "questions": [
+    {
+      "id": "context.goal",
+      "profile": "core",
+      "question": "Какой результат сценария нужен пользователю и что сейчас важнее остальных требований?",
+      "applies_to": [
+        "system",
+        "scenario"
+      ],
+      "any_tags": [],
+      "decision": "Цель ближайшей итерации",
+      "evidence_sources": [
+        "Описание пользователя",
+        "Реальный пользовательский сценарий",
+        "Наблюдаемый результат существующей системы"
+      ],
+      "revisit_when": [
+        "Изменились цели или приоритеты"
+      ],
+      "source_ids": [
+        "ADD-2024"
+      ]
+    },
+    {
+      "id": "context.boundary",
+      "profile": "core",
+      "question": "Что находится внутри нашей ответственности, что принадлежит окружению и чем мы можем управлять?",
+      "applies_to": [
+        "system",
+        "actor",
+        "external_system"
+      ],
+      "any_tags": [],
+      "decision": "Граница системы и полномочия исследования",
+      "evidence_sources": [
+        "Контекстная схема",
+        "Владелец внешней системы",
+        "Реальные права доступа и среда"
+      ],
+      "revisit_when": [
+        "Новый участник или интеграция",
+        "Изменились полномочия"
+      ],
+      "source_ids": [
+        "ARC42-METHOD"
+      ]
+    },
+    {
+      "id": "quality.drivers",
+      "profile": "core",
+      "question": "Какое требование качества способно изменить устройство системы и как пользователь определяет приемлемый результат?",
+      "applies_to": [
+        "system",
+        "scenario"
+      ],
+      "any_tags": [],
+      "decision": "Архитектурные приоритеты",
+      "evidence_sources": [
+        "Цели и ограничения пользователя",
+        "Данные реальной нагрузки",
+        "Условия эксплуатации"
+      ],
+      "revisit_when": [
+        "Изменилась нагрузка",
+        "Появилось существенное ограничение"
+      ],
+      "source_ids": [
+        "ADD-2024"
+      ]
+    },
+    {
+      "id": "boundary.responsibility",
+      "profile": "core",
+      "question": "Какую обязанность выполняет компонент и где заканчивается его ответственность?",
+      "applies_to": [
+        "component"
+      ],
+      "any_tags": [],
+      "decision": "Граница компонента",
+      "evidence_sources": [
+        "Входы и выходы сценария",
+        "Исходный код и вызывающие стороны",
+        "Владение данными"
+      ],
+      "revisit_when": [
+        "Компонент получил новую обязанность",
+        "Повторяющиеся совместные изменения"
+      ],
+      "source_ids": [
+        "ARC42-BLOCKS"
+      ]
+    },
+    {
+      "id": "boundary.change",
+      "profile": "core",
+      "question": "Какие части должны изменяться независимо и какие фактические зависимости этому препятствуют?",
+      "applies_to": [
+        "component",
+        "data"
+      ],
+      "any_tags": [],
+      "decision": "Разделение обязанностей",
+      "evidence_sources": [
+        "Граф зависимостей",
+        "История изменений",
+        "Причины совместного изменения кода"
+      ],
+      "revisit_when": [
+        "Изменился внешний контракт",
+        "Регулярные изменения требуют затрагивать много компонентов"
+      ],
+      "source_ids": [
+        "SEI-MAINT-2020"
+      ]
+    },
+    {
+      "id": "state.owner",
+      "profile": "core",
+      "question": "Кто владеет записью этих данных и какой источник считается достоверным при расхождении?",
+      "applies_to": [
+        "data"
+      ],
+      "any_tags": [],
+      "decision": "Владение состоянием",
+      "evidence_sources": [
+        "Места записи в коде",
+        "Контракты хранилищ",
+        "Наблюдаемое обновление данных"
+      ],
+      "revisit_when": [
+        "Появился второй писатель",
+        "Добавлен кэш или реплика"
+      ],
+      "source_ids": [
+        "SEI-MAINT-2020"
+      ]
+    },
+    {
+      "id": "state.atomicity",
+      "profile": "core",
+      "question": "Какие изменения должны завершаться вместе и какое состояние останется после частичного выполнения?",
+      "applies_to": [
+        "component",
+        "data"
+      ],
+      "any_tags": [
+        "transaction",
+        "mutable_state",
+        "database",
+        "orm"
+      ],
+      "decision": "Граница согласованности и восстановления",
+      "evidence_sources": [
+        "Границы транзакций в коде",
+        "Контракт хранилища",
+        "Сценарий прерванного выполнения"
+      ],
+      "revisit_when": [
+        "Добавлен побочный эффект",
+        "Изменился владелец транзакции"
+      ],
+      "source_ids": [
+        "COSMIC-PYTHON"
+      ]
+    },
+    {
+      "id": "integration.contract",
+      "profile": "core",
+      "question": "Что внешний сервис действительно гарантирует, что мы лишь предполагаем и кто подтверждает контракт?",
+      "applies_to": [
+        "external_system"
+      ],
+      "any_tags": [],
+      "decision": "Контракт интеграции",
+      "evidence_sources": [
+        "Официальный контракт конкретной версии",
+        "Реальный запрос и ответ",
+        "Владелец внешней системы"
+      ],
+      "revisit_when": [
+        "Изменилась версия API",
+        "Получен ответ вне ожиданий"
+      ],
+      "source_ids": [
+        "ARC42-METHOD"
+      ]
+    },
+    {
+      "id": "integration.retry",
+      "profile": "core",
+      "question": "Что произойдёт при повторе операции после неизвестного результата предыдущего вызова?",
+      "applies_to": [
+        "external_system",
+        "component"
+      ],
+      "any_tags": [
+        "writes_external",
+        "retry",
+        "side_effect"
+      ],
+      "decision": "Повторы и восстановление",
+      "evidence_sources": [
+        "Контракт идемпотентности",
+        "Место вызова и повтора",
+        "Ограниченное реальное исследование"
+      ],
+      "revisit_when": [
+        "Изменилась политика повторов",
+        "Внешний сервис поменял семантику операции"
+      ],
+      "source_ids": [
+        "ADD-2024"
+      ]
+    },
+    {
+      "id": "runtime.failure",
+      "profile": "core",
+      "question": "Как сценарий завершится при задержке или недоступности зависимости и кто увидит незавершённую работу?",
+      "applies_to": [
+        "component",
+        "external_system"
+      ],
+      "any_tags": [
+        "io",
+        "external_call",
+        "background",
+        "http"
+      ],
+      "decision": "Обработка отказов",
+      "evidence_sources": [
+        "Реальные задержки и ошибки",
+        "Таймауты и обработчики в коде",
+        "Трассировка сквозного сценария"
+      ],
+      "revisit_when": [
+        "Новый тип отказа",
+        "Изменился бюджет ожидания"
+      ],
+      "source_ids": [
+        "ADD-2024"
+      ]
+    },
+    {
+      "id": "runtime.capacity",
+      "profile": "core",
+      "question": "Какой ресурс первым ограничивает сценарий и чем обоснована модель конкурентного выполнения?",
+      "applies_to": [
+        "component",
+        "system"
+      ],
+      "any_tags": [
+        "concurrency",
+        "batch",
+        "worker",
+        "stream"
+      ],
+      "decision": "Конкурентность и ограничения ресурса",
+      "evidence_sources": [
+        "Профиль реальной нагрузки",
+        "Очереди и лимиты",
+        "Измерения времени CPU, I/O и памяти"
+      ],
+      "revisit_when": [
+        "Изменились объём или форма нагрузки",
+        "Изменились лимиты окружения"
+      ],
+      "source_ids": [
+        "ADD-2024"
+      ]
+    },
+    {
+      "id": "architecture.cost",
+      "profile": "core",
+      "question": "Какую конкретную проблему решает новый слой или компонент и какой более простой вариант рассмотрен?",
+      "applies_to": [
+        "component",
+        "decision"
+      ],
+      "any_tags": [],
+      "decision": "Цена сложности",
+      "evidence_sources": [
+        "Зависимое требование",
+        "Сравнение альтернатив",
+        "Эксплуатационные обязанности"
+      ],
+      "revisit_when": [
+        "Появилась новая абстракция",
+        "Исчезло исходное ограничение"
+      ],
+      "source_ids": [
+        "FAIRBANKS-RISK",
+        "COSMIC-PYTHON"
+      ]
+    },
+    {
+      "id": "evidence.challenge",
+      "profile": "core",
+      "question": "Какие основания поддерживают утверждение и какое наблюдение могло бы изменить нашу позицию?",
+      "applies_to": [
+        "claim",
+        "decision"
+      ],
+      "any_tags": [],
+      "decision": "Достаточность оснований",
+      "evidence_sources": [
+        "Источник утверждения",
+        "Привязанные свидетельства",
+        "Явные пределы наблюдения"
+      ],
+      "revisit_when": [
+        "Получены противоречивые данные",
+        "Изменились условия наблюдения"
+      ],
+      "source_ids": [
+        "SEI-MAINT-2020"
+      ]
+    },
+    {
+      "id": "decision.revisit",
+      "profile": "core",
+      "question": "Какой компромисс принят, кто выбрал его и при каких условиях нужно вернуться к решению?",
+      "applies_to": [
+        "decision"
+      ],
+      "any_tags": [],
+      "decision": "Условие пересмотра",
+      "evidence_sources": [
+        "Обсуждение с пользователем",
+        "Отклонённые альтернативы",
+        "Принятые последствия"
+      ],
+      "revisit_when": [
+        "Наступило записанное условие пересмотра",
+        "Изменились цели или ограничения"
+      ],
+      "source_ids": [
+        "ADD-2024"
+      ]
+    },
+    {
+      "id": "change.impact",
+      "profile": "core",
+      "question": "Какую реальную проблему существующей системы решает изменение и какие сценарии оно затронет?",
+      "applies_to": [
+        "artifact",
+        "component"
+      ],
+      "any_tags": [
+        "existing_code",
+        "legacy"
+      ],
+      "decision": "Область изменения существующего проекта",
+      "evidence_sources": [
+        "Исходный код",
+        "Наблюдаемые проблемы",
+        "История изменений и использования"
+      ],
+      "revisit_when": [
+        "Появилось предложение рефакторинга",
+        "Обнаружена незапланированная зависимость"
+      ],
+      "source_ids": [
+        "COSMIC-LEGACY"
+      ]
+    },
+    {
+      "id": "python.dependencies",
+      "profile": "python",
+      "question": "Соответствуют ли импорты согласованным границам и какие связи скрыты за динамической загрузкой или общим состоянием?",
+      "applies_to": [
+        "component",
+        "artifact"
+      ],
+      "any_tags": [
+        "python"
+      ],
+      "decision": "Направления зависимостей Python",
+      "evidence_sources": [
+        "AST импортов",
+        "Места динамической загрузки",
+        "Привязка пакетов к компонентам"
+      ],
+      "revisit_when": [
+        "Добавлен импорт",
+        "Изменилось размещение пакетов"
+      ],
+      "source_ids": [
+        "SEI-MAINT-2020",
+        "COSMIC-PYTHON"
+      ]
+    },
+    {
+      "id": "python.import-effects",
+      "profile": "python",
+      "question": "Какие действия выполняются при импорте и нужны ли они до явного запуска приложения?",
+      "applies_to": [
+        "component",
+        "artifact"
+      ],
+      "any_tags": [
+        "python"
+      ],
+      "decision": "Инициализация приложения",
+      "evidence_sources": [
+        "Код верхнего уровня модулей",
+        "Фабрики приложения",
+        "Наблюдение запуска"
+      ],
+      "revisit_when": [
+        "Добавлена глобальная инициализация",
+        "Изменилась точка запуска"
+      ],
+      "source_ids": [
+        "COSMIC-PYTHON"
+      ]
+    },
+    {
+      "id": "python.domain-boundary",
+      "profile": "python",
+      "question": "Какие бизнес-правила зависят от HTTP, ORM или очереди и оправдана ли стоимость выделения отдельного слоя?",
+      "applies_to": [
+        "component",
+        "artifact"
+      ],
+      "any_tags": [
+        "python"
+      ],
+      "decision": "Граница правил и инфраструктуры",
+      "evidence_sources": [
+        "Обработчики сценариев",
+        "Доменные правила",
+        "Код обращения к инфраструктуре"
+      ],
+      "revisit_when": [
+        "Правило появилось в нескольких обработчиках",
+        "Изменилась инфраструктура"
+      ],
+      "source_ids": [
+        "COSMIC-PYTHON"
+      ]
+    },
+    {
+      "id": "python.resource-lifetime",
+      "profile": "python",
+      "question": "Кто создаёт и закрывает клиент, соединение или сессию и совпадает ли срок жизни ресурса со сценарием?",
+      "applies_to": [
+        "component",
+        "artifact"
+      ],
+      "any_tags": [
+        "python"
+      ],
+      "decision": "Владение ресурсами",
+      "evidence_sources": [
+        "Контекстные менеджеры",
+        "Startup/shutdown обработчики",
+        "Наблюдение открытых ресурсов"
+      ],
+      "revisit_when": [
+        "Добавлен ресурс",
+        "Появилось фоновое выполнение"
+      ],
+      "source_ids": [
+        "COSMIC-PYTHON",
+        "PYTHON-ASYNCIO"
+      ]
+    },
+    {
+      "id": "python.async-blocking",
+      "profile": "python",
+      "question": "Есть ли блокирующая работа внутри event loop и чем подтверждено, что она не задерживает соседние задачи?",
+      "applies_to": [
+        "component",
+        "artifact"
+      ],
+      "any_tags": [
+        "async",
+        "asyncio",
+        "python_async"
+      ],
+      "decision": "Модель выполнения I/O и CPU",
+      "evidence_sources": [
+        "Полная цепочка вызовов",
+        "Документация используемого клиента",
+        "Трассировка задержек event loop"
+      ],
+      "revisit_when": [
+        "Добавлен синхронный клиент",
+        "Изменилась длительность вычислений"
+      ],
+      "source_ids": [
+        "PYTHON-ASYNCIO"
+      ]
+    },
+    {
+      "id": "python.async-lifecycle",
+      "profile": "python",
+      "question": "Кто наблюдает ошибки фоновых задач и что происходит при отмене или завершении приложения?",
+      "applies_to": [
+        "component",
+        "artifact"
+      ],
+      "any_tags": [
+        "async",
+        "asyncio",
+        "python_async"
+      ],
+      "decision": "Жизненный цикл фоновых задач",
+      "evidence_sources": [
+        "Создание и ожидание задач",
+        "Обработчики исключений",
+        "Реальный сценарий завершения"
+      ],
+      "revisit_when": [
+        "Добавлена фоновая задача",
+        "Изменилась политика отмены"
+      ],
+      "source_ids": [
+        "PYTHON-ASYNCIO"
+      ]
+    },
+    {
+      "id": "python.orm-transaction",
+      "profile": "python",
+      "question": "Кто управляет commit/rollback и может ли доступ к объекту незаметно вызвать дополнительный I/O?",
+      "applies_to": [
+        "component",
+        "artifact"
+      ],
+      "any_tags": [
+        "orm",
+        "sqlalchemy",
+        "django_orm"
+      ],
+      "decision": "Граница ORM и транзакции",
+      "evidence_sources": [
+        "Код сессий и запросов",
+        "Контракт ORM выбранной версии",
+        "Наблюдаемые запросы к БД"
+      ],
+      "revisit_when": [
+        "Изменился срок жизни сессии",
+        "Добавлена загрузка связанных объектов"
+      ],
+      "source_ids": [
+        "COSMIC-PYTHON"
+      ]
+    },
+    {
+      "id": "python.delivery",
+      "profile": "python",
+      "question": "Запускается ли поставляемый артефакт в целевой среде без зависимости от рабочего каталога и локальных файлов?",
+      "applies_to": [
+        "system",
+        "artifact"
+      ],
+      "any_tags": [
+        "python"
+      ],
+      "decision": "Граница поставки и запуска",
+      "evidence_sources": [
+        "pyproject.toml",
+        "Установка собранного пакета",
+        "Команда запуска в целевой среде"
+      ],
+      "revisit_when": [
+        "Изменились упаковка или точки входа",
+        "Поменялась среда исполнения"
+      ],
+      "source_ids": [
+        "PYPA-LAYOUT"
+      ]
+    }
+  ]
+}

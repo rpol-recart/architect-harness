@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "architect-harness": {
+      "command": "/ABSOLUTE/PATH/TO/venv/bin/python",
+      "args": ["-m", "architect_harness", "--db", "/ABSOLUTE/PATH/TO/architecture.sqlite", "serve"]
+    }
+  }
+}

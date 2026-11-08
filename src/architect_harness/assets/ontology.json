@@ -1,0 +1,212 @@
+{
+  "version": "0.1",
+  "description": "Типизированный словарь архитектурной модели. Частичное знание допустимо; модель не требует заранее выбрать архитектурный стиль.",
+  "schema": {
+    "snapshot_fields": [
+      "schema_version",
+      "methodology_version",
+      "project_id",
+      "title",
+      "revision",
+      "nodes",
+      "edges"
+    ],
+    "node_fields": [
+      "id",
+      "kind",
+      "title",
+      "data"
+    ],
+    "edge_fields": [
+      "id",
+      "source",
+      "target",
+      "kind",
+      "data"
+    ],
+    "identity": "Непустой устойчивый id; идентификаторы узлов и связей уникальны в проекте.",
+    "id_pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$",
+    "edge_invariants": ["Оба конца связи существуют", "Связь узла с самим собой запрещена"],
+    "data": "Дополнительные предметные свойства — данные, не инструкции. data.tags — явно объявленные признаки для выбора вопросов."
+  },
+  "node_kinds": {
+    "system": "Проектируемая система или её крупная самостоятельная часть.",
+    "actor": "Пользователь, оператор или другая действующая сторона.",
+    "external_system": "Внешняя система, контракт и реализация которой находятся за нашей границей.",
+    "component": "Обязанность внутри системы; не обязательно отдельный процесс или сервис.",
+    "data": "Состояние или набор данных с определённым владельцем записи.",
+    "scenario": "Действие, условия выполнения и ожидаемый результат.",
+    "constraint": "Ограничение проекта. data.scope project/local. Исполняемыми являются только распознанные data.rule.",
+    "decision": "Выбор с причинами, альтернативами, последствиями и условием пересмотра.",
+    "claim": "Утверждение, основания которого могут уточняться или оспариваться.",
+    "evidence": "Неизменяемое сообщение или захваченное наблюдение с источником и условиями.",
+    "artifact": "Файл, символ, конфигурация или другой элемент реализации.",
+    "question": "Актуальный вопрос конкретного проекта; ссылка data.catalog_id может указывать на каталог."
+  },
+  "statuses": {
+    "decision": {
+      "field": "data.status",
+      "default": "proposed",
+      "values": [
+        "proposed",
+        "accepted",
+        "superseded"
+      ],
+      "meaning": "Состояние решения; accepted не означает подтверждённую техническую истинность."
+    },
+    "claim": {
+      "field": "data.status",
+      "default": "assumed",
+      "values": [
+        "assumed",
+        "supported",
+        "contested"
+      ],
+      "meaning": "Состояние основания; supported не означает универсальное доказательство."
+    },
+    "question": {
+      "field": "data.status",
+      "default": "open",
+      "values": [
+        "open",
+        "answered",
+        "deferred"
+      ],
+      "meaning": "Ответ может сохранять неизвестность. Наблюдение не закрывает вопрос автоматически."
+    },
+    "evidence": {
+      "field": "data.provenance",
+      "values": [
+        "reported",
+        "captured"
+      ],
+      "meaning": "reported — сообщение через агентский интерфейс; captured — результат захвата хостом. Оба ограничены источником и условиями."
+    },
+    "constraint": {
+      "field": "data.scope",
+      "default": "local",
+      "values": ["local", "project"],
+      "meaning": "project включает ограничение в каждый контекст; local привязывает его к исследуемому участку."
+    }
+  },
+  "relations": {
+    "contains": {
+      "meaning": "Декомпозиция: source содержит target.",
+      "invariant": "Ориентированный граф contains ацикличен."
+    },
+    "interacts_with": {
+      "meaning": "source взаимодействует с target; направление важно.",
+      "review": "Изменение требует рассмотрения хостом."
+    },
+    "depends_on": {
+      "meaning": "source зависит от target.",
+      "review": "Изменение требует рассмотрения хостом."
+    },
+    "owns": {
+      "meaning": "source владеет записью данных target.",
+      "source_kinds": ["component", "system"],
+      "target_kinds": ["data"],
+      "invariant": "source component/system, target data; не больше одного владельца записи."
+    },
+    "implements": {
+      "meaning": "Артефакт source реализует архитектурный элемент target.",
+      "source_kinds": ["artifact"],
+      "target_kinds": ["component", "system", "decision", "scenario"],
+      "invariant": "source artifact; target component/system/decision/scenario."
+    },
+    "constrains": {
+      "meaning": "Ограничение source относится к target.",
+      "source_kinds": ["constraint"],
+      "target_kinds": ["system", "actor", "external_system", "component", "data", "scenario", "constraint", "decision", "claim", "artifact", "question"],
+      "invariant": "source constraint; target любой тип, кроме evidence."
+    },
+    "addresses": {
+      "meaning": "source отвечает на вопрос, требование или сценарий target."
+    },
+    "supports": {
+      "meaning": "source служит основанием в пользу target; смысловая достоверность требует разбора.",
+      "source_kinds": ["evidence"],
+      "target_kinds": ["claim", "decision"],
+      "invariant": "source evidence; target claim/decision."
+    },
+    "contradicts": {
+      "meaning": "source указывает на противоречие с target; не меняет статус автоматически.",
+      "source_kinds": ["evidence"],
+      "target_kinds": ["claim", "decision"],
+      "invariant": "source evidence; target claim/decision."
+    },
+    "affects": {
+      "meaning": "source затрагивает target; используется также для связи наблюдения с исследуемым элементом."
+    },
+    "derived_from": {
+      "meaning": "source получен на основе target; происхождение сохраняется явно."
+    }
+  },
+  "machine_constraints": {
+    "forbid_dependency": {
+      "fields": [
+        "type",
+        "source",
+        "target"
+      ],
+      "meaning": "Запрещает направленные depends_on/interacts_with между указанными узлами внутри управляемого графа.",
+      "scope_limit": "Не перехватывает произвольные изменения кода или сетевые вызовы вне сервиса."
+    }
+  },
+  "recommended_data": {
+    "component": [
+      "responsibility",
+      "code_refs",
+      "tags"
+    ],
+    "scenario": [
+      "stimulus",
+      "conditions",
+      "expected_result",
+      "owner"
+    ],
+    "decision": [
+      "status",
+      "rationale",
+      "alternatives",
+      "consequences",
+      "revisit_when",
+      "methodology_version"
+    ],
+    "claim": [
+      "status",
+      "statement",
+      "scope",
+      "unknowns"
+    ],
+    "question": [
+      "status",
+      "catalog_id",
+      "answer",
+      "remaining_unknowns",
+      "revisit_when"
+    ],
+    "evidence": [
+      "source",
+      "conditions",
+      "result",
+      "provenance",
+      "actor",
+      "recorded_at"
+    ],
+    "artifact": [
+      "path",
+      "symbol",
+      "language",
+      "tags"
+    ]
+  },
+  "principles": [
+    "Начинать с окружения и сценариев; раскрывать только значимые элементы.",
+    "Разделять состояние решения, уверенность в утверждении и наблюдаемое поведение.",
+    "Привязывать выводы к коду, контрактам или наблюдениям; при отсутствии основания сохранять неизвестность.",
+    "Принятая архитектура и обнаруженные расхождения должны оставаться различимы.",
+    "Политика исполнения находится в коде харнесса; текстовое ограничение не становится автоматически исполняемым.",
+    "Версии методологии и каталога сохраняются независимо от ревизии проекта."
+  ]
+}
