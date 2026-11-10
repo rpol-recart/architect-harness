@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Human-readable graph projection; labels are always treated as data."""
 
 import html

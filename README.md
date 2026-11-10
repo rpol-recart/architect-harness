@@ -1,4 +1,4 @@
-# Агентский харнесс архитектора — v0.2 для OpenCode 2.2.5
+# Агентский харнесс архитектора — v0.3.0 для OpenCode 2.2.5
 
 Проект среды, в которой пользователь и агент постепенно проектируют сложную систему,
 ведут архитектурный граф, обсуждают компромиссы и уточняют решения по коду и реальному окружению.
@@ -121,6 +121,22 @@ ID из результата `propose`:
 .venv/bin/python -m architect_harness --db architecture.sqlite mermaid
 ```
 
+Просмотр lifecycle и отмена неприменённого предложения оператором
+([ADR-009](docs/DECISIONS.md#adr-009-терминальный-lifecycle-предложений-без-переписывания-истории)):
+
+```bash
+/absolute/path/.venv/bin/python -m architect_harness --db /absolute/path/architecture.sqlite list-changes
+/absolute/path/.venv/bin/python -m architect_harness --db /absolute/path/architecture.sqlite cancel CHANGE_ID --revision N --reviewer "Владелец проекта"
+```
+
+Замените абсолютные пути и `CHANGE_ID`; `N` — текущая ревизия из заголовка
+`list-changes`. Команда чтения показывает id, payload- и эффективный статус,
+base/applied_revision, время создания и автора. Отмена не удаляет предложение и
+не меняет граф: append-only событие делает его `cancelled`, запрещая approve/apply.
+`cancel`, как и `approve`, отсутствует в MCP. Optional `supersedes` у MCP
+`propose_change` связывает замену с прежним предложением; цель становится
+`superseded` только после операторского approve и успешного apply замены.
+
 Согласование требуется для существенных изменений согласно политике. Локальное изменение,
 которое не затрагивает защищённые элементы, применяется без отдельного согласования.
 `approve` отсутствует среди MCP tools. Это граница интерфейса, **не OS sandbox**:
@@ -235,6 +251,9 @@ node --test tests/opencode-plugin.test.mjs
 .venv/bin/python scripts/mcp_roundtrip.py
 .venv/bin/python scripts/opencode_smoke.py --output reports/opencode-smoke.json
 ```
+
+JS-тест использует `python3` из PATH с установленным пакетом; для другого
+интерпретатора задайте `HARNESS_PYTHON=.venv/bin/python node --test tests/opencode-plugin.test.mjs`.
 
 Последняя команда создаёт временный проект и отдельный настоящий сервер OpenCode;
 не меняет глобальные настройки, не использует ключи провайдеров и не вызывает LLM.

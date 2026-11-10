@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Explicit host-side, read-only HTTP observation. Not exposed as a general MCP tool."""
 
 import hashlib

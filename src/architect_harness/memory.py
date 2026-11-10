@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Durable operational checkpoints and immutable, paged context details.
 
 This store never grants graph approval. Checkpoints are agent reports; original

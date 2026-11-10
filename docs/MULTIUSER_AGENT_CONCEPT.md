@@ -109,7 +109,7 @@ OpenCode и политика архитектурного графа также 
 ориентирован на OpenCode 2.2.5. Общая страница документации не заменяет проверку
 контракта этой версии. В концепции не устанавливаются ни provider, ни ключи.
 
-Статическое чтение установленного `/root/.opencode/bin/opencode` версии 2.2.5
+Статическое чтение установленного `~/.opencode/bin/opencode` версии 2.2.5
 показало нативную секцию `providers` и поля `package`, `settings`, `headers`,
 `body`, `models`. Встроенный `@opencode/ai/providers/openai-compatible` использует
 `/chat/completions` и разбирает потоковые `delta.tool_calls`. В бинарнике есть и

@@ -1,0 +1,5 @@
+include requirements-mcp.lock
+recursive-include docs *.md
+prune docs/specs
+recursive-include scripts *.py
+recursive-include tests *.py *.js *.mjs

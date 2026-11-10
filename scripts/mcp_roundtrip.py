@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Exercise the actual stdio process using the official MCP client, not a protocol mock."""
 import argparse
 import asyncio

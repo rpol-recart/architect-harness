@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, readFile, rm } from "node:fs/promises";
@@ -7,7 +8,7 @@ import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
 // Actual installed Python/SQLite plus a minimal hook boundary, no simulated LLM.
-const python = process.env.HARNESS_PYTHON || path.resolve(".venv/bin/python");
+const python = process.env.HARNESS_PYTHON ?? "python3";
 
 test("fresh memory on context, compaction and generate; scoped and cleaned up", async () => {
   const workspace = await mkdtemp(path.join(tmpdir(), "architect plugin '"));

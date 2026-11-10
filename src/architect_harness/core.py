@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Версионируемый граф и архитектурные операции без зависимости от MCP.
 
 The host is the trust boundary: approve_change and record_captured_observation
@@ -33,6 +34,7 @@ STATUSES = {
     "question": ("open", "answered", "deferred"),
 }
 IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,127}$")
+TERMINAL_EVENTS = {"cancel": "cancelled", "supersede": "superseded"}
 
 
 class HarnessError(Exception):
@@ -369,6 +371,38 @@ class GraphService:
     def _put_change(self, change: dict) -> None:
         self._db.execute("UPDATE proposals SET payload=? WHERE id=?", (_json(change), change["id"]))
 
+    def _effective_status(self, proposal: dict) -> str:
+        row = self._db.execute(
+            "SELECT kind FROM events WHERE kind IN ('cancel','supersede') "
+            "AND json_extract(details,'$.change_id')=? ORDER BY id DESC LIMIT 1",
+            (proposal["id"],),
+        ).fetchone()
+        return TERMINAL_EVENTS[row[0]] if row else proposal["status"]
+
+    def _check_active(self, proposal: dict) -> None:
+        status = self._effective_status(proposal)
+        if status in TERMINAL_EVENTS.values():
+            raise HarnessError(f"proposal_{status}", "Предложение находится в терминальном состоянии.")
+
+    def _check_supersedes_target(self, change_id: str) -> None:
+        target = self._get_change(change_id)
+        self._check_active(target)
+        if target["status"] == "applied":
+            raise HarnessError("supersedes_applied", "Нельзя заместить уже применённое предложение.")
+
+    def cancel_change(self, change_id: str, expected_revision: int, reviewer: str) -> dict:
+        """Host-only: append a terminal event without changing graph or payload."""
+        _text(reviewer, "reviewer", 200)
+        with self._transaction():
+            graph = self._snapshot()
+            self._check_revision(expected_revision, graph)
+            change = self._get_change(change_id)
+            self._check_active(change)
+            if change["status"] == "applied":
+                raise HarnessError("already_applied", "Предложение уже применено.")
+            self._event("cancel", reviewer, graph["revision"], {"change_id": change_id})
+            return {**change, "effective_status": self._effective_status(change)}
+
     def initialize(self, project_id: str, title: str) -> dict:
         _id(project_id)
         _text(title, "title", 1000)
@@ -390,7 +424,8 @@ class GraphService:
         with self._lock:
             return self._snapshot()
 
-    def propose_change(self, base_revision: int, operations: list[dict], rationale: str, actor: str = "agent") -> dict:
+    def propose_change(self, base_revision: int, operations: list[dict], rationale: str, actor: str = "agent",
+                       supersedes: str | None = None) -> dict:
         _text(rationale, "rationale")
         _text(actor, "actor", 200)
         with self._transaction():
@@ -405,13 +440,39 @@ class GraphService:
                       "status": "proposed", "operations": json.loads(_json(operations)),
                       "rationale": rationale, "actor": actor, "review_required": bool(reasons),
                       "review_reasons": reasons, "diff": diff, "created_at": _now()}
+            if supersedes is not None:
+                _id(supersedes)
+                if supersedes == change["id"]:
+                    raise HarnessError("invalid_input", "Предложение не может замещать само себя.")
+                self._check_supersedes_target(supersedes)
+                change["supersedes"] = supersedes
+                # Superseding another proposal always requires the host's approval.
+                reasons.append(f"Замещение предложения: {supersedes}")
+                change["review_required"] = True
             self._db.execute("INSERT INTO proposals(id,payload) VALUES (?,?)", (change["id"], _json(change)))
             self._event("propose", actor, before["revision"], {"change_id": change["id"], "review_required": bool(reasons)})
             return deepcopy(change)
 
     def get_change(self, change_id: str) -> dict:
         with self._lock:
-            return self._get_change(change_id)
+            change = self._get_change(change_id)
+            return {**change, "effective_status": self._effective_status(change)}
+
+    @classmethod
+    def list_changes(cls, db_path: str | Path) -> dict:
+        """Read proposal lifecycle in one snapshot, without initializing or writing a DB."""
+        reader = cls.__new__(cls)
+        reader._db = sqlite3.connect(Path(db_path).resolve().as_uri() + "?mode=ro", isolation_level=None)
+        try:
+            reader._db.execute("BEGIN")
+            revision = reader._snapshot()["revision"]
+            changes = []
+            for (payload,) in reader._db.execute("SELECT payload FROM proposals ORDER BY rowid"):
+                change = json.loads(payload)
+                changes.append({**change, "effective_status": reader._effective_status(change)})
+            return {"revision": revision, "changes": changes}
+        finally:
+            reader._db.close()
 
     def approve_change(self, change_id: str, expected_revision: int, reviewer: str) -> dict:
         """Host-only operation. Identity authentication belongs to the calling host."""
@@ -420,6 +481,7 @@ class GraphService:
             graph = self._snapshot()
             self._check_revision(expected_revision, graph)
             change = self._get_change(change_id)
+            self._check_active(change)
             if change["base_revision"] != expected_revision:
                 raise HarnessError("stale_revision", "Предложение относится к другой ревизии.")
             if change["status"] == "applied":
@@ -435,13 +497,18 @@ class GraphService:
         _revision(expected_revision)
         with self._transaction():
             change = self._get_change(change_id)
-            if expected_revision != change["base_revision"]:
-                raise HarnessError("stale_revision", "Ожидаемая ревизия не совпадает с основанием предложения.")
+            self._check_active(change)
             if change["status"] == "applied":
+                if expected_revision != change["base_revision"]:
+                    raise HarnessError("stale_revision", "Ожидаемая ревизия не совпадает с основанием предложения.")
                 row = self._db.execute("SELECT snapshot FROM revisions WHERE revision=?", (change["applied_revision"],)).fetchone()
                 return json.loads(row[0])
             before = self._snapshot()
             self._check_revision(expected_revision, before)
+            if change.get("supersedes") is not None:
+                self._check_supersedes_target(change["supersedes"])
+            if expected_revision != change["base_revision"]:
+                raise HarnessError("stale_revision", "Ожидаемая ревизия не совпадает с основанием предложения.")
             if change["review_required"] and change["status"] != "approved":
                 raise HarnessError("review_required", "Для этого изменения требуется решение пользователя.", {
                     "change_id": change_id, "reasons": change["review_reasons"],
@@ -452,6 +519,9 @@ class GraphService:
             change.update(status="applied", applied_revision=after["revision"], applied_at=_now())
             self._put_change(change)
             self._event("apply", change["actor"], after["revision"], {"change_id": change_id})
+            if change.get("supersedes") is not None:
+                self._event("supersede", change["actor"], after["revision"],
+                            {"change_id": change["supersedes"], "by": change_id})
             return after
 
     def record_observation(self, title: str, source: str, conditions: str, result: str,
@@ -507,7 +577,7 @@ class GraphService:
                 for item in graph[collection]:
                     if item["id"] == ref:
                         return deepcopy(item)
-            return self._get_change(ref)
+            return self.get_change(ref)
 
     def history(self) -> list[dict]:
         with self._lock:

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Детерминированная сборка контекста; текст графа не исполняется как инструкция."""
 
 from __future__ import annotations

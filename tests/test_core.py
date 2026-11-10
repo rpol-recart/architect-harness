@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Проверки границ доверия, ревизий и атомарности архитектурного графа."""
 
 from concurrent.futures import ThreadPoolExecutor
@@ -6,6 +7,8 @@ from pathlib import Path
 import tempfile
 import threading
 import unittest
+from unittest.mock import patch
+from uuid import UUID
 
 from architect_harness.core import GraphService, HarnessError
 
@@ -96,6 +99,160 @@ class GraphServiceTests(unittest.TestCase):
         self.assertEqual(self.service.snapshot()["revision"], 2)
         self.assert_error("stale_revision", self.service.apply_change, proposal["id"], 2)
         self.assertEqual(len([e for e in self.service.history() if e["kind"] == "apply"]), 2)
+
+    def test_cancel_blocks_approve_and_apply(self):
+        proposal = self.service.propose_change(0, [node("api")], "Каркас")
+        before = self.service.snapshot()
+        self.assert_error("stale_revision", self.service.cancel_change, proposal["id"], 1, "Оператор")
+        self.assert_error("not_found", self.service.cancel_change, "change_missing", 0, "Оператор")
+        cancelled = self.service.cancel_change(proposal["id"], 0, "Оператор")
+        self.assertEqual(cancelled["effective_status"], "cancelled")
+        self.assertEqual(self.service.get_change(proposal["id"])["effective_status"], "cancelled")
+        self.assertEqual(self.service.inspect(proposal["id"])["effective_status"], "cancelled")
+        for method, args in ((self.service.approve_change, ("Оператор",)),
+                             (self.service.apply_change, ()),
+                             (self.service.cancel_change, ("Оператор",))):
+            self.assert_error("proposal_cancelled", method, proposal["id"], 0, *args)
+        self.assertEqual(self.service.snapshot(), before)
+        self.assertEqual(self.service.history()[-1]["kind"], "cancel")
+        self.assertEqual(self.service.history()[-1]["revision"], 0)
+        self.assertEqual(self.service.history()[-1]["actor"], "Оператор")
+        self.assertEqual(self.service.history()[-1]["details"], {"change_id": proposal["id"]})
+        self.assertEqual(len(self.service.history()), 3)
+
+    def test_supersedes_effective_only_after_apply(self):
+        target = self.service.propose_change(0, [node("old")], "Исходное")
+        replacement = self.service.propose_change(0, [node("new")], "Исправление", supersedes=target["id"])
+        self.assertEqual(replacement["supersedes"], target["id"])
+        self.assertTrue(replacement["review_required"])
+        self.assert_error("review_required", self.service.apply_change, replacement["id"], 0)
+        self.service.approve_change(target["id"], 0, "Оператор")
+        target_payload = self.service._db.execute("SELECT payload FROM proposals WHERE id=?", (target["id"],)).fetchone()[0]
+        self.service.approve_change(replacement["id"], 0, "Оператор")
+        self.assertEqual(self.service.get_change(target["id"])["effective_status"], "approved")
+        self.assertFalse(any(e["kind"] == "supersede" for e in self.service.history()))
+        graph = self.service.apply_change(replacement["id"], 0)
+        self.assertEqual(graph["revision"], 1)
+        self.assertEqual(self.service.get_change(target["id"])["effective_status"], "superseded")
+        self.assertEqual(self.service._db.execute("SELECT payload FROM proposals WHERE id=?", (target["id"],)).fetchone()[0], target_payload)
+        self.assertEqual(self.service.history()[-1]["details"], {"change_id": target["id"], "by": replacement["id"]})
+        for method, revision, args in ((self.service.apply_change, 0, ()),
+                                       (self.service.approve_change, 1, ("Оператор",)),
+                                       (self.service.cancel_change, 1, ("Оператор",))):
+            self.assert_error("proposal_superseded", method, target["id"], revision, *args)
+        history = self.service.history()
+        self.assertEqual(self.service.apply_change(replacement["id"], 0), graph)
+        self.assertEqual(self.service.history(), history)
+
+    def test_effective_status_of_old_rows_unchanged(self):
+        proposed = self.service.propose_change(0, [node("a")], "Первое")
+        approved = self.service.propose_change(0, [node("b")], "Второе")
+        self.service.approve_change(approved["id"], 0, "Оператор")
+        applied = self.service.propose_change(0, [node("c")], "Третье")
+        graph = self.service.apply_change(applied["id"], 0)
+        other = GraphService(self.path)
+        try:
+            for proposal, status in ((proposed, "proposed"), (approved, "approved"), (applied, "applied")):
+                saved = other.get_change(proposal["id"])
+                self.assertEqual(saved["status"], status)
+                self.assertEqual(saved["effective_status"], status)
+                self.assertNotIn("supersedes", saved)
+            self.assert_error("already_applied", other.cancel_change, applied["id"], 1, "Оператор")
+            self.assertEqual(other.apply_change(applied["id"], 0), graph)
+        finally:
+            other.close()
+
+    def test_cancelled_payload_unchanged(self):
+        proposal = self.service.propose_change(0, [node("api")], "Каркас")
+        self.service.approve_change(proposal["id"], 0, "Оператор")
+        self.commit([node("other")])
+        payloads = self.service._db.execute("SELECT id,payload FROM proposals ORDER BY id").fetchall()
+        revisions = self.service._db.execute("SELECT * FROM revisions").fetchall()
+        # Отменять можно и устаревшее предложение, CAS относится к текущему графу.
+        self.service.cancel_change(proposal["id"], 1, "Оператор")
+        self.assertEqual(self.service._db.execute("SELECT id,payload FROM proposals ORDER BY id").fetchall(), payloads)
+        self.assertEqual(self.service._db.execute("SELECT * FROM revisions").fetchall(), revisions)
+        other = GraphService(self.path)
+        try:
+            self.assertEqual(other.get_change(proposal["id"])["status"], "approved")
+            self.assertEqual(other.get_change(proposal["id"])["effective_status"], "cancelled")
+        finally:
+            other.close()
+
+    def test_supersedes_validation_does_not_write_invalid_proposals(self):
+        target = self.service.propose_change(0, [node("old")], "Исходное")
+        self.service.cancel_change(target["id"], 0, "Оператор")
+        history = self.service.history()
+        for target_id, error in (("change_missing", "not_found"), (target["id"], "proposal_cancelled"),
+                                 (True, "invalid_input")):
+            self.assert_error(error, self.service.propose_change, 0, [node("new")], "Замена", supersedes=target_id)
+        with patch("architect_harness.core.uuid4", return_value=UUID(int=0)):
+            self.assert_error("invalid_input", self.service.propose_change, 0, [node("new")], "Самозамена",
+                              supersedes="change_" + "0" * 32)
+        self.assertEqual(self.service.history(), history)
+        self.assertEqual(self.service._db.execute("SELECT count(*) FROM proposals").fetchone()[0], 1)
+
+    def test_supersede_event_failure_rolls_back_entire_apply(self):
+        target = self.service.propose_change(0, [node("old")], "Исходное")
+        replacement = self.service.propose_change(0, [node("new")], "Замена", supersedes=target["id"])
+        self.service.approve_change(replacement["id"], 0, "Оператор")
+        before = self.service.snapshot()
+        history = self.service.history()
+        payloads = self.service._db.execute("SELECT id,payload FROM proposals ORDER BY id").fetchall()
+        event = self.service._event
+
+        def fail_supersede(kind, *args):
+            if kind == "supersede":
+                raise RuntimeError("Ошибка записи терминального события")
+            event(kind, *args)
+
+        with patch.object(self.service, "_event", side_effect=fail_supersede):
+            with self.assertRaises(RuntimeError):
+                self.service.apply_change(replacement["id"], 0)
+        self.assertEqual(self.service.snapshot(), before)
+        self.assertEqual(self.service.history(), history)
+        self.assertEqual(self.service._db.execute("SELECT id,payload FROM proposals ORDER BY id").fetchall(), payloads)
+        self.assertEqual(self.service._db.execute("SELECT count(*) FROM revisions").fetchone()[0], 1)
+
+    def test_supersedes_does_not_prevent_target_apply_before_replacement(self):
+        target = self.service.propose_change(0, [node("old")], "Исходное")
+        replacement = self.service.propose_change(0, [node("new")], "Замена", supersedes=target["id"])
+        self.service.approve_change(replacement["id"], 0, "Оператор")
+        graph = self.service.apply_change(target["id"], 0)
+        self.assert_error("stale_revision", self.service.apply_change, replacement["id"], 0)
+        self.assertEqual(self.service.apply_change(target["id"], 0), graph)
+        self.assertFalse(any(e["kind"] == "supersede" for e in self.service.history()))
+
+    def test_propose_cannot_supersede_applied_target(self):
+        target = self.service.propose_change(0, [node("old")], "Исходное")
+        applied = self.service.apply_change(target["id"], 0)
+        history = self.service.history()
+        payloads = self.service._db.execute("SELECT id,payload FROM proposals ORDER BY id").fetchall()
+        self.assert_error("supersedes_applied", self.service.propose_change, 1,
+                          [node("new")], "Замена", supersedes=target["id"])
+        self.assertEqual(self.service.snapshot(), applied)
+        self.assertEqual(self.service.history(), history)
+        self.assertEqual(self.service._db.execute("SELECT id,payload FROM proposals ORDER BY id").fetchall(), payloads)
+        self.assertEqual(self.service.apply_change(target["id"], 0), applied)
+
+    def test_apply_cannot_supersede_target_applied_after_propose(self):
+        target = self.service.propose_change(0, [node("old")], "Исходное")
+        replacement = self.service.propose_change(0, [node("new")], "Замена", supersedes=target["id"])
+        self.service.approve_change(target["id"], 0, "Оператор")
+        self.service.approve_change(replacement["id"], 0, "Оператор")
+        applied = self.service.apply_change(target["id"], 0)
+        history = self.service.history()
+        payloads = self.service._db.execute("SELECT id,payload FROM proposals ORDER BY id").fetchall()
+        revisions = self.service._db.execute("SELECT * FROM revisions").fetchall()
+        self.assert_error("supersedes_applied", self.service.apply_change, replacement["id"], 1)
+        self.assertFalse(self.service._db.in_transaction)
+        self.assertEqual(self.service.snapshot(), applied)
+        self.assertEqual(self.service.history(), history)
+        self.assertEqual(self.service._db.execute("SELECT id,payload FROM proposals ORDER BY id").fetchall(), payloads)
+        self.assertEqual(self.service._db.execute("SELECT * FROM revisions").fetchall(), revisions)
+        self.assertEqual(self.service.get_change(target["id"])["effective_status"], "applied")
+        self.assertEqual(self.service.apply_change(target["id"], 0), applied)
+        self.assertEqual(self.service.history(), history)
 
     def test_concurrent_connections_cannot_overwrite_each_other(self):
         other = GraphService(self.path)

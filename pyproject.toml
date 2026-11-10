@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "architect-harness"
-version = "0.2.0"
+version = "0.3.0"
 description = "Versioned architectural memory and decision workflow for a human–agent pair"
 readme = "README.md"
 requires-python = ">=3.11"

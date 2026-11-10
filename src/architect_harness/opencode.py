@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """OpenCode 2.2.5 host adapter; the graph and its policies remain in the core."""
 
 from __future__ import annotations
@@ -145,7 +146,7 @@ def install(workspace: Path, project_id: str = "project", title: str = "Новы
     assets = {
         workspace / ".opencode/architect-harness/index.js": _asset("opencode-plugin.js"),
         workspace / ".opencode/architect-harness/package.json": json.dumps({
-            "name": "architect-harness-opencode", "version": "0.2.0", "type": "module", "main": "index.js",
+            "name": "architect-harness-opencode", "version": "0.3.0", "type": "module", "main": "index.js",
         }, indent=2) + "\n",
         workspace / ".architecture/.gitignore": "*\n!.gitignore\n",
     }
@@ -236,6 +237,10 @@ def read_context(database: str | Path, profiles: list[str] | None = None, max_by
 def doctor(workspace: Path, executable: str = "opencode") -> dict:
     workspace = Path(workspace).expanduser().resolve()
     checks = {}
+    runtime_paths = [workspace / ".opencode/opencode.json",
+                     workspace / ".opencode/architect-harness/index.js",
+                     workspace / ".opencode/architect-harness/package.json"]
+    warnings = []
     try:
         result = subprocess.run([executable, "--version"], text=True, capture_output=True, timeout=10, check=True)
         version = result.stdout.strip().removeprefix("opencode ").removeprefix("v")
@@ -250,6 +255,10 @@ def doctor(workspace: Path, executable: str = "opencode") -> dict:
     try:
         config = json.loads((workspace / ".opencode/opencode.json").read_text(encoding="utf-8"))
         server = config["mcp"]["servers"]["architect"]
+        if Path(server["command"][0]).is_absolute():
+            runtime_paths.append(Path(server["command"][0]))
+        if "cwd" in server:
+            runtime_paths.append(workspace / server["cwd"])
         checks["configuration"] = {"ok": all(a in config["agents"] for a in AGENTS)
                                    and server["protocol"] == "2026-07-28" and server["codemode"] is False}
         checks["context_policy"] = {"ok": config.get("compaction") == {
@@ -258,7 +267,13 @@ def doctor(workspace: Path, executable: str = "opencode") -> dict:
         checks["plugin"] = {"ok": (workspace / ".opencode/architect-harness/index.js").read_text(encoding="utf-8") == _asset("opencode-plugin.js")}
         context = read_context(workspace / ".architecture/architecture.sqlite")
         checks["memory"] = {"ok": True, "revision": context["context"]["revision"]}
-    except (OSError, ValueError, KeyError, TypeError, HarnessError, sqlite3.Error) as error:
+    except (OSError, ValueError, KeyError, IndexError, TypeError, HarnessError, sqlite3.Error) as error:
         checks["installation"] = {"ok": False, "error": str(error)}
+    for path in runtime_paths:
+        if not path.exists():
+            warnings.append(f"Missing runtime path: {path}")
+    checks["runtime_paths"] = {"ok": not warnings, "paths": [str(path) for path in runtime_paths],
+                               "warnings": warnings}
     return {"ok": all(item["ok"] for item in checks.values()), "checks": checks,
+            "warnings": warnings,
             "limits": "Local installation checks; run scripts/opencode_smoke.py to verify the actual host. LLM not called."}

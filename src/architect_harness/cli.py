@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Operator CLI. The approve command belongs to a trusted host/user boundary."""
 
 import argparse
@@ -25,6 +26,8 @@ def parser() -> argparse.ArgumentParser:
     p = actions.add_parser("show-change"); p.add_argument("id")
     p = actions.add_parser("inspect"); p.add_argument("id")
     p = actions.add_parser("approve"); p.add_argument("id"); p.add_argument("--revision", type=int, required=True); p.add_argument("--reviewer", required=True)
+    p = actions.add_parser("cancel"); p.add_argument("id"); p.add_argument("--revision", type=int, required=True); p.add_argument("--reviewer", required=True)
+    actions.add_parser("list-changes", help="Прочитать статусы предложений без изменения БД")
     p = actions.add_parser("apply"); p.add_argument("id"); p.add_argument("--revision", type=int, required=True)
     p = actions.add_parser("observe"); p.add_argument("file", help="JSON report; provenance is always reported")
     p = actions.add_parser("probe-http"); p.add_argument("url"); p.add_argument("--allow-origin", action="append", required=True); p.add_argument("--related", action="append", required=True)
@@ -68,6 +71,16 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "inspect-python":
             from .inspection import inspect_python
             result = inspect_python(args.root)
+        elif args.command == "list-changes":
+            listing = GraphService.list_changes(args.db)
+            print(f"# revision={listing['revision']} id|payload|effective|base_revision|applied_revision|created_at|actor")
+            for change in listing["changes"]:
+                # JSON quoting keeps untrusted actor strings on one physical line.
+                print("|".join(str(value) for value in (
+                    change["id"], change["status"], change["effective_status"],
+                    change["base_revision"], change.get("applied_revision", "-"),
+                    change["created_at"], json.dumps(change["actor"], ensure_ascii=False))))
+            return 0
         else:
             service = GraphService(args.db)
             if args.command == "init":
@@ -80,6 +93,7 @@ def main(argv: list[str] | None = None) -> int:
             elif args.command == "show-change": result = service.get_change(args.id)
             elif args.command == "inspect": result = service.inspect(args.id)
             elif args.command == "approve": result = service.approve_change(args.id, args.revision, args.reviewer)
+            elif args.command == "cancel": result = service.cancel_change(args.id, args.revision, args.reviewer)
             elif args.command == "apply": result = service.apply_change(args.id, args.revision)
             elif args.command == "observe":
                 data = read_json(args.file)

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Run a real local HTTP observation and persist it across service instances.
 
 This is a transport/lifecycle demonstration, not validation of a production API.

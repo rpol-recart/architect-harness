@@ -1,7 +1,9 @@
+# SPDX-License-Identifier: Apache-2.0
 """Official MCP SDK adapter. Host authorization is intentionally not an MCP tool."""
 
 import json
 from importlib.resources import files
+from typing import Annotated
 
 from . import __version__
 from .context import get_context as build_context
@@ -13,6 +15,7 @@ def create_server(db_path: str):
     try:
         from mcp.server import MCPServer
         from mcp.server.mcpserver.exceptions import ResourceError, ToolError
+        from pydantic import Field
     except ImportError as error:
         raise RuntimeError('Установите MCP-зависимости: python -m pip install ".[mcp]"') from error
 
@@ -78,9 +81,14 @@ def create_server(db_path: str):
         return call(service.inspect, ref)
 
     @server.tool()
-    def propose_change(base_revision: int, operations: list[dict], rationale: str) -> dict:
-        """Prepare an atomic graph diff against a known revision; returns host review requirements."""
-        return call(service.propose_change, base_revision, operations, rationale, actor="mcp-agent")
+    def propose_change(base_revision: int, operations: list[dict], rationale: str,
+                       supersedes: Annotated[str | None, Field(description=
+                           "ID предложения, которое это замещает; помечается superseded только после approve+apply данного предложения")] = None) -> dict:
+        """Prepare an atomic graph diff against a known revision; returns host review requirements.
+
+        supersedes: ID предложения, которое это замещает; помечается superseded только после approve+apply данного предложения.
+        """
+        return call(service.propose_change, base_revision, operations, rationale, actor="mcp-agent", supersedes=supersedes)
 
     @server.tool()
     def apply_change(change_id: str, expected_revision: int) -> dict:

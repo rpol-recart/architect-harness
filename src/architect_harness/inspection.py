@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Bounded, read-only AST inspection. Findings are hints, never runtime evidence."""
 
 import ast

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """Проверка загрузки харнесса настоящим OpenCode 2.2.5 без обращения к LLM.
 
 Запуск: python scripts/opencode_smoke.py [--output /path/evidence.json]
